@@ -18,6 +18,10 @@
 #include "driver/gpio.h"
 
 
+// Mark this variable to be placed in the RTC_DATA_ATTR which will cause its value to be retained
+// even while in deep sleep.
+static RTC_DATA_ATTR unsigned int s_boot_count = 0;
+
 static const char* wakeup_cause_to_string(esp_sleep_wakeup_cause_t cause)
 {
     switch (cause) {
@@ -116,16 +120,18 @@ static void timer_handler(TimerHandle_t deep_sleep_timer)
     // Wake up if GPIO0 goes low
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
 
-    // Wake up from deep sleep after 60s
-    ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(60 * 1000 * 1000));
+    // Wake up from deep sleep after 30s
+    ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(30 * 1000 * 1000));
 
     esp_deep_sleep_start();
 }
 
 void app_main(void)
 {
+    s_boot_count++;
     printf(
-        "Boot wakeup cause: %s\n",
+        "Boot count: %u, wakeup cause: %s\n",
+        s_boot_count,
         wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
     TimerHandle_t deep_sleep_timer =
         xTimerCreate("deep sleep", pdMS_TO_TICKS(20 * 1000), pdFALSE, NULL, timer_handler);
@@ -134,11 +140,11 @@ void app_main(void)
     setup_push_button(deep_sleep_timer);
     configASSERT(deep_sleep_timer != NULL);
     configASSERT(xTimerStart(deep_sleep_timer, portMAX_DELAY) == pdPASS);
-    while (true) {
-        printf(
-            "loop - level = %d, wakeup cause: %s\n",
-            gpio_get_level(GPIO_NUM_0),
-            wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
+    for (int i = 1; ; i++) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
+        printf(
+            "In 5s delay loop - count = %d, wakeup cause = %s\n",
+            i,
+            wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
     }
 }
