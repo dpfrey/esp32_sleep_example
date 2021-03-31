@@ -1,0 +1,5 @@
+# We need access to the power management features
+CONFIG_PM_ENABLE=y
+
+# Need tickless idle for automatic light sleep
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
