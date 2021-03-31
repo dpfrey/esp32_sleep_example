@@ -104,9 +104,6 @@ static void setup_push_button(void)
 
 void app_main(void)
 {
-    // esp_pm_lock_handle_t light_sleep_lock;
-    // ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "main", &light_sleep_lock));
-    // ESP_ERROR_CHECK(esp_pm_lock_acquire(light_sleep_lock));
     setup_power_management();
     setup_sleep();
 
@@ -116,7 +113,6 @@ void app_main(void)
 
     setup_push_button();
     while (true) {
-        // ESP_ERROR_CHECK(esp_pm_lock_release(light_sleep_lock));
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         printf(
             "Another 5s expired - level = %d, wakeup cause: %s\n",
