@@ -56,8 +56,7 @@ static void setup_power_management(void)
     const esp_pm_config_esp32_t pm_config = {
         .max_freq_mhz = 240,
         .min_freq_mhz = 80,
-        //.light_sleep_enable = true,
-        .light_sleep_enable = false,
+        .light_sleep_enable = true,
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }
@@ -109,11 +108,10 @@ void app_main(void)
     setup_sleep();
     setup_push_button();
     while (true) {
-        ESP_ERROR_CHECK(esp_light_sleep_start());
         printf(
-            "awake! - level = %d, wakeup cause: %s\n",
+            "timer expired - level = %d, wakeup cause: %s\n",
             gpio_get_level(GPIO_NUM_0),
             wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
