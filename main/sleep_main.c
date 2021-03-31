@@ -56,14 +56,18 @@ static void setup_power_management(void)
     const esp_pm_config_esp32_t pm_config = {
         .max_freq_mhz = 240,
         .min_freq_mhz = 80,
-        .light_sleep_enable = true,
+        //.light_sleep_enable = true,
+        .light_sleep_enable = false,
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }
 
 static void setup_sleep(void)
 {
-    //ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
+    ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
+
+    // Enable wakeup when the button is pushed
+    ESP_ERROR_CHECK(gpio_wakeup_enable(GPIO_NUM_0, GPIO_INTR_LOW_LEVEL));
 }
 
 void push_button_deferred_handler(void *p1, uint32_t p2)
@@ -97,26 +101,19 @@ static void setup_push_button(void)
     };
     ESP_ERROR_CHECK(gpio_config(&button_config));
     ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_NUM_0, push_button_isr_handler, NULL));
-
-    // Enable wakeup when the button is pushed
-    //ESP_ERROR_CHECK(gpio_wakeup_enable(GPIO_NUM_0, GPIO_INTR_LOW_LEVEL));
 }
 
 void app_main(void)
 {
     setup_power_management();
     setup_sleep();
-
-    printf("about to pend function call\n");
-    configASSERT(xTimerPendFunctionCall(push_button_deferred_handler, NULL, 0, portMAX_DELAY) == pdPASS);
-    printf("done pend function call\n");
-
     setup_push_button();
     while (true) {
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        ESP_ERROR_CHECK(esp_light_sleep_start());
         printf(
-            "Another 5s expired - level = %d, wakeup cause: %s\n",
+            "awake! - level = %d, wakeup cause: %s\n",
             gpio_get_level(GPIO_NUM_0),
             wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
