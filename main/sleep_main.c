@@ -69,24 +69,26 @@ static void setup_sleep(void)
     ESP_ERROR_CHECK(gpio_wakeup_enable(GPIO_NUM_0, GPIO_INTR_LOW_LEVEL));
 }
 
-void push_button_deferred_handler(void *p1, uint32_t p2)
+static void push_button_deferred_handler(void *p1, uint32_t p2)
 {
+    TimerHandle_t deep_sleep_timer = p1;
+    xTimerReset(deep_sleep_timer, portMAX_DELAY);
     printf(
         "push button pressed - wakeup cause: %s\n",
         wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
 }
 
-void push_button_isr_handler(void *context)
+static void push_button_isr_handler(void *context)
 {
     BaseType_t higher_priority_task_woken = pdFALSE;
     configASSERT(xTimerPendFunctionCallFromISR(
-                     push_button_deferred_handler, NULL, 0, &higher_priority_task_woken) == pdPASS);
+                     push_button_deferred_handler, context, 0, &higher_priority_task_woken) == pdPASS);
     if (higher_priority_task_woken) {
         portYIELD_FROM_ISR();
     }
 }
 
-static void setup_push_button(void)
+static void setup_push_button(TimerHandle_t deep_sleep_timer)
 {
     // Use the centralized GPIO service
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
@@ -99,19 +101,44 @@ static void setup_push_button(void)
         .intr_type = GPIO_INTR_NEGEDGE,
     };
     ESP_ERROR_CHECK(gpio_config(&button_config));
-    ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_NUM_0, push_button_isr_handler, NULL));
+    ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_NUM_0, push_button_isr_handler, deep_sleep_timer));
+}
+
+static void timer_handler(TimerHandle_t deep_sleep_timer)
+{
+    printf("Deep sleep timer expired - requesting deep sleep\n");
+
+    // Disable any wakeup sources that were previously configured. In testing it was found that
+    // leftover GPIO wakeup sources (which aren't compatible with deep sleep) cause a reboot when
+    // deep sleep is requested.
+    ESP_ERROR_CHECK(esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL));
+
+    // Wake up if GPIO0 goes low
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
+
+    // Wake up from deep sleep after 60s
+    ESP_ERROR_CHECK(esp_sleep_enable_timer_wakeup(60 * 1000 * 1000));
+
+    esp_deep_sleep_start();
 }
 
 void app_main(void)
 {
+    printf(
+        "Boot wakeup cause: %s\n",
+        wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
+    TimerHandle_t deep_sleep_timer =
+        xTimerCreate("deep sleep", pdMS_TO_TICKS(20 * 1000), pdFALSE, NULL, timer_handler);
     setup_power_management();
     setup_sleep();
-    setup_push_button();
+    setup_push_button(deep_sleep_timer);
+    configASSERT(deep_sleep_timer != NULL);
+    configASSERT(xTimerStart(deep_sleep_timer, portMAX_DELAY) == pdPASS);
     while (true) {
         printf(
-            "timer expired - level = %d, wakeup cause: %s\n",
+            "loop - level = %d, wakeup cause: %s\n",
             gpio_get_level(GPIO_NUM_0),
             wakeup_cause_to_string(esp_sleep_get_wakeup_cause()));
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
