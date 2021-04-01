@@ -1,4 +1,4 @@
-/* Hello World Example
+/* Light and Deep Sleep Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
 
@@ -86,7 +86,7 @@ static void push_button_isr_handler(void *context)
 {
     BaseType_t higher_priority_task_woken = pdFALSE;
     configASSERT(xTimerPendFunctionCallFromISR(
-                     push_button_deferred_handler, context, 0, &higher_priority_task_woken) == pdPASS);
+        push_button_deferred_handler, context, 0, &higher_priority_task_woken) == pdPASS);
     if (higher_priority_task_woken) {
         portYIELD_FROM_ISR();
     }
@@ -141,6 +141,7 @@ void app_main(void)
     configASSERT(deep_sleep_timer != NULL);
     configASSERT(xTimerStart(deep_sleep_timer, portMAX_DELAY) == pdPASS);
     for (int i = 1; ; i++) {
+        // The system will automatically enter light sleep during this delay
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         printf(
             "In 5s delay loop - count = %d, wakeup cause = %s\n",
